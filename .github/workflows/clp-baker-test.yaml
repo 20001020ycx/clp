@@ -36,11 +36,6 @@ jobs:
           pwd
           echo "hello world" >> a.txt
           cat a.txt
-      # we can go to any directory in baker 
-      - name: toy example 2
-        run: |
-          cd /home/ycx
-          cat github_ci.txt
       - name: read readonly big dataset on baker
         run: | 
           cd /home/bigDatasets
