@@ -11,6 +11,9 @@ dependencies = [
     "fastmcp>=2.10.0,<2.11.0",
     "smart-open>=1.8.2",
     "uvicorn>=0.27.0",
+    "pymongo>=4.15.1",
+    "aiomysql>=0.2.0",
+    "msgpack>=1.1.1",
 ]
 
 [project.scripts]
