@@ -1,79 +1,20 @@
 import argparse
-import json
 import logging
-import multiprocessing
-import os
 import pathlib
-import shlex
-import socket
-import subprocess
 import sys
-import time
-import uuid
-from typing import Any, Dict, List, Optional
 
-from clp_py_utils.clp_config import (
-    ALL_TARGET_NAME,
-    AwsAuthType,
-    CLPConfig,
-    COMPRESSION_JOBS_TABLE_NAME,
-    COMPRESSION_SCHEDULER_COMPONENT_NAME,
-    COMPRESSION_WORKER_COMPONENT_NAME,
-    CONTROLLER_TARGET_NAME,
-    DB_COMPONENT_NAME,
-    GARBAGE_COLLECTOR_COMPONENT_NAME,
-    get_components_for_target,
-    QUERY_JOBS_TABLE_NAME,
-    QUERY_SCHEDULER_COMPONENT_NAME,
-    QUERY_WORKER_COMPONENT_NAME,
-    QueryEngine,
-    QUEUE_COMPONENT_NAME,
-    REDIS_COMPONENT_NAME,
-    REDUCER_COMPONENT_NAME,
-    RESULTS_CACHE_COMPONENT_NAME,
-    StorageEngine,
-    StorageType,
-    WEBUI_COMPONENT_NAME,
-)
-from clp_py_utils.clp_metadata_db_utils import (
-    get_archives_table_name,
-    get_datasets_table_name,
-    get_files_table_name,
-)
-from clp_py_utils.s3_utils import generate_container_auth_options
-from job_orchestration.scheduler.constants import SchedulerType
-from pydantic import BaseModel
+from clp_py_utils.clp_config import CLP_DEFAULT_CONFIG_FILE_RELATIVE_PATH
 
+from clp_package_utils.controller import DockerComposeController, get_or_create_instance_id
 from clp_package_utils.general import (
-    check_dependencies,
-    CLP_DEFAULT_CONFIG_FILE_RELATIVE_PATH,
-    CLPDockerMounts,
-    CONTAINER_CLP_HOME,
-    DockerMount,
-    DockerMountType,
-    dump_shared_container_config,
-    generate_container_config,
-    get_celery_connection_env_vars_list,
     get_clp_home,
-    get_common_env_vars_list,
-    get_credential_env_vars_list,
-    is_container_exited,
-    is_container_running,
-    is_retention_period_configured,
     load_config_file,
     validate_and_load_db_credentials_file,
     validate_and_load_queue_credentials_file,
     validate_and_load_redis_credentials_file,
-    validate_db_config,
-    validate_log_directory,
     validate_logs_input_config,
     validate_output_storage_config,
-    validate_queue_config,
-    validate_redis_config,
-    validate_reducer_config,
-    validate_results_cache_config,
     validate_retention_config,
-    validate_webui_config,
 )
 
 logger = logging.getLogger(__file__)
@@ -1136,195 +1077,38 @@ def main(argv):
         default=str(default_config_file_path),
         help="CLP package configuration file.",
     )
-    args_parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Enable debug logging.",
-    )
-
-    component_args_parser = args_parser.add_subparsers(dest="target")
-    component_args_parser.add_parser(CONTROLLER_TARGET_NAME)
-    component_args_parser.add_parser(DB_COMPONENT_NAME)
-    component_args_parser.add_parser(QUEUE_COMPONENT_NAME)
-    component_args_parser.add_parser(REDIS_COMPONENT_NAME)
-    component_args_parser.add_parser(RESULTS_CACHE_COMPONENT_NAME)
-    component_args_parser.add_parser(COMPRESSION_SCHEDULER_COMPONENT_NAME)
-    component_args_parser.add_parser(QUERY_SCHEDULER_COMPONENT_NAME)
-    compression_worker_parser = component_args_parser.add_parser(COMPRESSION_WORKER_COMPONENT_NAME)
-    add_num_workers_argument(compression_worker_parser)
-    query_worker_parser = component_args_parser.add_parser(QUERY_WORKER_COMPONENT_NAME)
-    add_num_workers_argument(query_worker_parser)
-    reducer_server_parser = component_args_parser.add_parser(REDUCER_COMPONENT_NAME)
-    add_num_workers_argument(reducer_server_parser)
-    component_args_parser.add_parser(WEBUI_COMPONENT_NAME)
-    component_args_parser.add_parser(GARBAGE_COLLECTOR_COMPONENT_NAME)
 
     parsed_args = args_parser.parse_args(argv[1:])
-    if parsed_args.verbose:
-        logger.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
-
-    if parsed_args.target:
-        target = parsed_args.target
-    else:
-        target = ALL_TARGET_NAME
-
-    try:
-        check_dependencies()
-    except:
-        logger.exception("Dependency checking failed.")
-        return -1
 
     # Validate and load config file
     try:
         config_file_path = pathlib.Path(parsed_args.config)
         clp_config = load_config_file(config_file_path, default_config_file_path, clp_home)
 
-        runnable_components = clp_config.get_runnable_components()
-        components_to_start = get_components_for_target(target)
-        components_to_start = components_to_start.intersection(runnable_components)
-
-        # Exit early if no components to start
-        if len(components_to_start) == 0:
-            logger.error(f"{target} not available with current configuration")
-            return -1
-
-        # Validate and load necessary credentials
-        if target in (
-            ALL_TARGET_NAME,
-            CONTROLLER_TARGET_NAME,
-            DB_COMPONENT_NAME,
-            GARBAGE_COLLECTOR_COMPONENT_NAME,
-            COMPRESSION_SCHEDULER_COMPONENT_NAME,
-            QUERY_SCHEDULER_COMPONENT_NAME,
-            WEBUI_COMPONENT_NAME,
-        ):
-            validate_and_load_db_credentials_file(clp_config, clp_home, True)
-        if target in (
-            ALL_TARGET_NAME,
-            CONTROLLER_TARGET_NAME,
-            QUEUE_COMPONENT_NAME,
-            COMPRESSION_SCHEDULER_COMPONENT_NAME,
-            QUERY_SCHEDULER_COMPONENT_NAME,
-            COMPRESSION_WORKER_COMPONENT_NAME,
-            QUERY_WORKER_COMPONENT_NAME,
-        ):
-            validate_and_load_queue_credentials_file(clp_config, clp_home, True)
-        if target in (
-            ALL_TARGET_NAME,
-            CONTROLLER_TARGET_NAME,
-            REDIS_COMPONENT_NAME,
-            COMPRESSION_SCHEDULER_COMPONENT_NAME,
-            QUERY_SCHEDULER_COMPONENT_NAME,
-            COMPRESSION_WORKER_COMPONENT_NAME,
-            QUERY_WORKER_COMPONENT_NAME,
-        ):
-            validate_and_load_redis_credentials_file(clp_config, clp_home, True)
-        if target in (
-            ALL_TARGET_NAME,
-            COMPRESSION_WORKER_COMPONENT_NAME,
-        ):
-            validate_logs_input_config(clp_config)
-        if target in (
-            ALL_TARGET_NAME,
-            COMPRESSION_WORKER_COMPONENT_NAME,
-            QUERY_WORKER_COMPONENT_NAME,
-            GARBAGE_COLLECTOR_COMPONENT_NAME,
-        ):
-            validate_output_storage_config(clp_config)
-        if target in (
-            ALL_TARGET_NAME,
-            CONTROLLER_TARGET_NAME,
-            GARBAGE_COLLECTOR_COMPONENT_NAME,
-        ):
-            validate_retention_config(clp_config)
+        validate_and_load_db_credentials_file(clp_config, clp_home, True)
+        validate_and_load_queue_credentials_file(clp_config, clp_home, True)
+        validate_and_load_redis_credentials_file(clp_config, clp_home, True)
+        validate_logs_input_config(clp_config)
+        validate_output_storage_config(clp_config)
+        validate_retention_config(clp_config)
 
         clp_config.validate_data_dir()
         clp_config.validate_logs_dir()
         clp_config.validate_aws_config_dir()
+
+        # Create necessary directories
+        clp_config.data_directory.mkdir(parents=True, exist_ok=True)
+        clp_config.logs_directory.mkdir(parents=True, exist_ok=True)
+        clp_config.archive_output.get_directory().mkdir(parents=True, exist_ok=True)
+        clp_config.stream_output.get_directory().mkdir(parents=True, exist_ok=True)
     except:
         logger.exception("Failed to load config.")
         return -1
 
-    if target in (
-        COMPRESSION_WORKER_COMPONENT_NAME,
-        REDUCER_COMPONENT_NAME,
-        QUERY_WORKER_COMPONENT_NAME,
-    ):
-        num_workers = parsed_args.num_workers
-    else:
-        num_workers = multiprocessing.cpu_count() // 2
-
-    container_clp_config, mounts = generate_container_config(clp_config, clp_home)
-
-    # Create necessary directories
-    clp_config.data_directory.mkdir(parents=True, exist_ok=True)
-    clp_config.logs_directory.mkdir(parents=True, exist_ok=True)
-
-    dump_shared_container_config(container_clp_config, clp_config)
-
+    instance_id = get_or_create_instance_id(clp_config)
     try:
-        # Create instance-id file
-        instance_id_file_path = clp_config.logs_directory / "instance-id"
-        if instance_id_file_path.exists():
-            with open(instance_id_file_path, "r") as f:
-                instance_id = f.readline()
-        else:
-            instance_id = str(uuid.uuid4())[-4:]
-            with open(instance_id_file_path, "w") as f:
-                f.write(instance_id)
-                f.flush()
-
-        conf_dir = clp_home / "etc"
-
-        # Start components
-        if DB_COMPONENT_NAME in components_to_start:
-            start_db(instance_id, clp_config, conf_dir)
-
-        if (
-            target == CONTROLLER_TARGET_NAME and DB_COMPONENT_NAME in runnable_components
-        ) or DB_COMPONENT_NAME in components_to_start:
-            create_db_tables(instance_id, clp_config, container_clp_config, mounts)
-
-        if QUEUE_COMPONENT_NAME in components_to_start:
-            start_queue(instance_id, clp_config)
-
-        if REDIS_COMPONENT_NAME in components_to_start:
-            start_redis(instance_id, clp_config, conf_dir)
-
-        if RESULTS_CACHE_COMPONENT_NAME in components_to_start:
-            start_results_cache(instance_id, clp_config, conf_dir)
-
-        if (
-            target == CONTROLLER_TARGET_NAME and RESULTS_CACHE_COMPONENT_NAME in runnable_components
-        ) or RESULTS_CACHE_COMPONENT_NAME in components_to_start:
-            create_results_cache_indices(instance_id, clp_config, container_clp_config, mounts)
-
-        if COMPRESSION_SCHEDULER_COMPONENT_NAME in components_to_start:
-            start_compression_scheduler(instance_id, clp_config, container_clp_config, mounts)
-
-        if QUERY_SCHEDULER_COMPONENT_NAME in components_to_start:
-            start_query_scheduler(instance_id, clp_config, container_clp_config, mounts)
-
-        if COMPRESSION_WORKER_COMPONENT_NAME in components_to_start:
-            start_compression_worker(
-                instance_id, clp_config, container_clp_config, num_workers, mounts
-            )
-
-        if QUERY_WORKER_COMPONENT_NAME in components_to_start:
-            start_query_worker(instance_id, clp_config, container_clp_config, num_workers, mounts)
-
-        if REDUCER_COMPONENT_NAME in components_to_start:
-            start_reducer(instance_id, clp_config, container_clp_config, num_workers, mounts)
-
-        if WEBUI_COMPONENT_NAME in components_to_start:
-            start_webui(instance_id, clp_config, container_clp_config, mounts)
-
-        if GARBAGE_COLLECTOR_COMPONENT_NAME in components_to_start:
-            start_garbage_collector(instance_id, clp_config, container_clp_config, mounts)
-
+        controller = DockerComposeController(clp_config, instance_id)
+        controller.deploy()
     except Exception as ex:
         if type(ex) == ValueError:
             logger.error(f"Failed to start CLP: {ex}")
