@@ -2,27 +2,10 @@
 
 from typing import Any
 
-from fastmcp import FastMCP
-from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from fastmcp import Context, FastMCP
 
-
-class ProtocolConstant:
-    """Constants for the CLP MCP Server."""
-
-    SERVER_NAME = "clp-mcp-server"
-
-    # Tool names
-    TOOL_HELLO_WORLD = "hello_world"
-    TOOL_GET_SERVER_INFO = "get_server_info"
-
-    @classmethod
-    def get_capabilities(cls) -> list[str]:
-        """
-        Gets the capabilities of the server.
-        :return: A list of tool names supported by the server.
-        """
-        return [cls.TOOL_HELLO_WORLD, cls.TOOL_GET_SERVER_INFO]
+from . import constants
+from .session_manager import SessionManager
 
 
 def create_mcp_server() -> FastMCP:
@@ -33,33 +16,39 @@ def create_mcp_server() -> FastMCP:
     :raise: Propagates `FastMCP.__init__`'s exceptions.
     :raise: Propagates `FastMCP.tool`'s exceptions.
     """
-    mcp = FastMCP(name=ProtocolConstant.SERVER_NAME)
+    mcp = FastMCP(name=constants.SERVER_NAME)
 
-    @mcp.custom_route("/health", methods=["GET"])
-    async def health_check(_request: Request) -> PlainTextResponse:
+    session_manager = SessionManager(constants.SESSION_TTL_MINUTES)
+
+    @mcp.tool
+    def get_instructions(ctx: Context) -> str:
         """
-        Health check endpoint.
+        Gets a pre-defined “system prompt” that guides the LLM behavior.
+        This function must be invoked before any other `FastMCP.tool`.
 
-        :param _request: An HTTP request object.
-        :return: A JSON response indicating server is healthy.
+        :param ctx: The `FastMCP` context containing the metadata of the underlying MCP session.
+        :return: A string of “system prompt”.
         """
-        return PlainTextResponse("OK")
+        session = session_manager.get_or_create_session(ctx.session_id)
+        session.is_instructions_retrieved = True
+        return constants.SYSTEM_PROMPT
 
-
-    @mcp.tool()
-    def get_server_info() -> dict[str, Any]:
+    @mcp.tool
+    def get_nth_page(page_index: int, ctx: Context) -> dict[str, Any]:
         """
-        Gets the MCP server's information.
+        Retrieves the n-th page of a paginated response with the paging metadata from the previous
+        query.
 
-        :return: The server's information with a list of capabilities.
+        :param page_index: Zero-based index, e.g., 0 for the first page.
+        :param ctx: The `FastMCP` context containing the metadata of the underlying MCP session.
+        :return: Dictionary containing paged log entries and the paging metadata if the
+        page `page_index` can be retrieved.
+        :return: Dictionary with ``{"Error": "error message describing the failure"}`` if fails to
+        retrieve page `page_index`.
         """
-        return {
-            "name": ProtocolConstant.SERVER_NAME,
-            "capabilities": ProtocolConstant.get_capabilities(),
-            "status": "running",
-        }
+        return session_manager.get_nth_page(ctx.session_id, page_index)
 
-    @mcp.tool()
+    @mcp.tool
     def hello_world(name: str = "clp-mcp-server user") -> dict[str, Any]:
         """
         Provides a simple hello world greeting.
@@ -69,7 +58,7 @@ def create_mcp_server() -> FastMCP:
         """
         return {
             "message": f"Hello World, {name.strip()}!",
-            "server": ProtocolConstant.SERVER_NAME,
+            "server": constants.SERVER_NAME,
             "status": "running",
         }
 
