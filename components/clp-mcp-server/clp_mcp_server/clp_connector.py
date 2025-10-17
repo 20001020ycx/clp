@@ -29,16 +29,17 @@ class ClpConnector:
         self._results_cache = mongo_client[clp_config.results_cache.db_name]
 
         # Configuration to be used in `aiomysql.connect` to MariaDB.
-        print(CLP_DB_PASS)
         self._db_conf = {
             "host": clp_config.database.host,
             "port": clp_config.database.port,
             "user": CLP_DB_USER,
-            "password": "bsIb2SAFIXw",
+            "password": CLP_DB_PASS,
             "db": clp_config.database.name,
         }
 
-    async def submit_query(self, query: str, begin_ts: int, end_ts: int) -> str:
+    async def submit_query(
+        self, query: str, begin_ts: int | None = None, end_ts: int | None = None
+    ) -> str:
         """
         Submits a query to the CLP database and returns the ID of the query.
 
@@ -51,15 +52,15 @@ class ClpConnector:
         :raise pymongo.errors.PyMongoError: If there is an error interacting with MongoDB.
         :raise Exception: For any other unexpected errors.
         """
-        if end_ts < begin_ts:
+        if begin_ts is not None and end_ts is not None and end_ts < begin_ts:
             err_msg = f"end_ts {end_ts} is smaller than begin_ts {begin_ts}."
             raise ValueError(err_msg)
 
         job_config = msgpack.packb(
             {
-                "begin_timestamp": None,
+                "begin_timestamp": begin_ts,
                 "dataset": "default",
-                "end_timestamp": None,
+                "end_timestamp": end_ts,
                 "ignore_case": True,
                 "max_num_results": SEARCH_MAX_NUM_RESULTS,
                 "query_string": query,
