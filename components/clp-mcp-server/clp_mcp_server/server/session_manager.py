@@ -79,7 +79,7 @@ class SessionState:
 
     session_id: str
     _num_items_per_page: int
-    _session_ttl_minutes: int
+    _session_ttl_minutes: float
 
     _cached_query_result: PaginatedQueryResult | None = None
     _is_instructions_retrieved: bool = False
@@ -195,13 +195,13 @@ class SessionManager:
 
     def cleanup_expired_sessions(self) -> None:
         """Cleans up all expired sessions."""
-        with self._sessions_lock:
-            expired_sessions = [
-                sid for sid, session in self.sessions.items() if session.is_expired()
-            ]
+        # with self._sessions_lock:
+        expired_sessions = [
+            sid for sid, session in self.sessions.items() if session.is_expired()
+        ]
 
-            for sid in expired_sessions:
-                del self.sessions[sid]
+        for sid in expired_sessions:
+            del self.sessions[sid]
 
     def get_or_create_session(self, session_id: str) -> SessionState:
         """
@@ -210,19 +210,19 @@ class SessionManager:
         :param session_id: Unique identifier for the session.
         :return: The SessionState object for the given session_id.
         """
-        with self._sessions_lock:
-            if session_id in self.sessions and self.sessions[session_id].is_expired():
-                del self.sessions[session_id]
+        # with self._sessions_lock:
+        if session_id in self.sessions and self.sessions[session_id].is_expired():
+            del self.sessions[session_id]
 
-            if session_id not in self.sessions:
-                self.sessions[session_id] = SessionState(
-                    session_id, constants.NUM_ITEMS_PER_PAGE, self._session_ttl_minutes
-                )
+        if session_id not in self.sessions:
+            self.sessions[session_id] = SessionState(
+                session_id, constants.NUM_ITEMS_PER_PAGE, self._session_ttl_minutes
+            )
 
-            session = self.sessions[session_id]
+        session = self.sessions[session_id]
 
-            session.update_access_time()
-            return session
+        session.update_access_time()
+        return session
 
     def cache_query_result(self, session_id: str, query_results: list[str]) -> dict[str, Any]:
         """

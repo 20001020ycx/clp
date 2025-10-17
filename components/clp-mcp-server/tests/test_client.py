@@ -7,8 +7,8 @@ from fastmcp import Client
 async def test_concurrent_sessions():
     """Test that hello_world does not block other requests from other clients"""
     # Create two separate client instances
-    client_slow = Client("http://localhost:8001/mcp")
-    client_fast = Client("http://localhost:8001/mcp")
+    client_slow = Client("http://localhost:8005/mcp")
+    client_fast = Client("http://localhost:8005/mcp")
 
     async def slow_client_task():
         """Client that calls hello_world (takes infinite time)"""
@@ -18,7 +18,7 @@ async def test_concurrent_sessions():
             print("Slow client: Starting hello_world (infinite time)...")
 
             # This will run forever - don't await it directly
-            result = await client_slow.call_tool("hello_world")
+            result = await client_slow.call_tool("search_kql_query", kql_query="error")
             print(f"Slow client: hello_world completed: {result}")
             return "slow_done"
 
@@ -33,7 +33,7 @@ async def test_concurrent_sessions():
 
             print("Fast client: Making get_instructions call...")
             start_time = time.time()
-            result = await client_fast.call_tool("get_instructions")
+            result = await client_fast.call_tool("search_kql_query", kql_query="error")
             end_time = time.time()
 
             print(f"Fast client: get_instructions completed in {end_time - start_time:.2f} seconds")

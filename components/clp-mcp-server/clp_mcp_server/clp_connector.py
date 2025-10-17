@@ -29,11 +29,12 @@ class ClpConnector:
         self._results_cache = mongo_client[clp_config.results_cache.db_name]
 
         # Configuration to be used in `aiomysql.connect` to MariaDB.
+        print(CLP_DB_PASS)
         self._db_conf = {
             "host": clp_config.database.host,
             "port": clp_config.database.port,
             "user": CLP_DB_USER,
-            "password": CLP_DB_PASS,
+            "password": "bsIb2SAFIXw",
             "db": clp_config.database.name,
         }
 
@@ -56,9 +57,9 @@ class ClpConnector:
 
         job_config = msgpack.packb(
             {
-                "begin_timestamp": begin_ts,
-                "dataset": None,
-                "end_timestamp": end_ts,
+                "begin_timestamp": None,
+                "dataset": "default",
+                "end_timestamp": None,
                 "ignore_case": True,
                 "max_num_results": SEARCH_MAX_NUM_RESULTS,
                 "query_string": query,
@@ -132,7 +133,7 @@ class ClpConnector:
             if status == QueryJobStatus.SUCCEEDED:
                 break
             if status in error_states:
-                err_msg = f"Query job with ID {query_id} ended in status {status.name}."
+                err_msg = f"Query job with ID {query_id} ended in status {status}."
                 raise RuntimeError(err_msg)
             if status not in waiting_states:
                 err_msg = f"Query job with ID {query_id} has unknown status {status}."
