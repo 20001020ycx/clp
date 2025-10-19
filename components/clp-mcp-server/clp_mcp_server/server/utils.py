@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 
-def _convert_epoch_to_date_string(epoch_ts: int) -> str:
+def convert_epoch_to_date_string(epoch_ts: int) -> str:
     """
     :param epoch_ts: Unix epoch timestamp in milliseconds
     :return: ISO 8601 formatted date string with millisecond precision (YYYY-MM-DDTHH:mm:ss.fffZ)
@@ -27,7 +27,45 @@ def _convert_epoch_to_date_string(epoch_ts: int) -> str:
         raise ValueError(f"Invalid timestamp {epoch_ts}: {e}") from e
 
 
-def clean_query_results(results: list[dict]) -> list[str]:
+def convert_date_string_to_epoch(date_string: str) -> int:
+    """
+    :param date_string: ISO 8601 formatted date string (YYYY-MM-DDTHH:mm:ss.fffZ or similar)
+    :return: Unix epoch timestamp in milliseconds
+    :raise TypeError: If date_string is None or not a string
+    :raise ValueError: If date_string cannot be parsed or is invalid
+    """
+    if date_string is None:
+        err_msg = "Date string cannot be None"
+        raise TypeError(err_msg)
+
+    if not isinstance(date_string, str):
+        err_msg = f"Date string must be str, got {type(date_string).__name__}"
+        raise TypeError(err_msg)
+
+    try:
+        # Remove 'Z' suffix if present and parse
+        cleaned_string = date_string.rstrip('Z')
+
+        # Try parsing ISO format with fractional seconds
+        if '.' in cleaned_string:
+            dt = datetime.fromisoformat(cleaned_string)
+        else:
+            # Handle ISO format without fractional seconds
+            dt = datetime.fromisoformat(cleaned_string)
+
+        # Ensure timezone aware (assume UTC if naive)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        # Convert to milliseconds
+        epoch_seconds = dt.timestamp()
+        return int(epoch_seconds * 1000)
+
+    except (ValueError, AttributeError) as e:
+        raise ValueError(f"Invalid date string '{date_string}': {e}") from e
+
+
+def clean_query_result(results: list[dict]) -> list[str]:
     """
     Clean query results by keeping only timestamp and message fields.
 
@@ -37,28 +75,15 @@ def clean_query_results(results: list[dict]) -> list[str]:
     :raise ValueError: If timestamp is out of valid range
     """
     cleaned = []
-    try:
-        for obj in results:
-            timestamp_str = _convert_epoch_to_date_string(obj.get("timestamp"))
+    for obj in results:
+        try:
+            timestamp_str = convert_epoch_to_date_string(obj.get("timestamp"))
             message = obj.get("message", "")
             cleaned.append(f"timestamp: {timestamp_str}, message: {message}")
-    except (TypeError, ValueError) as e:
-        # Re-raise with context about which entry failed
-        raise type(e)(f"Failed to clean result entry: {e}") from e
+        except (TypeError, ValueError) as e:
+            # Re-raise with context about which entry failed
+            logging.error(f"Failed to clean result entry: {e}, obj: {obj}")
+            cleaned.append(f"timestamp: N/A, message: {obj.get('message', '')}")
 
     return cleaned
 
-
-def validate_date_string(date_string: str) -> bool:
-    """
-    Validates if a string is in ISO 8601 format (YYYY-MM-DDTHH:mm:ss.fffZ)
-
-    :param date_string: Date string to validate
-    :return: True if valid ISO 8601 format, False otherwise
-    """
-    try:
-        # Try parsing the date string with milliseconds
-        datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S.%fZ")
-        return True
-    except ValueError:
-        return False
