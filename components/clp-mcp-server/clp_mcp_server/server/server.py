@@ -1,6 +1,5 @@
 """MCP Server implementation."""
 
-from types import SimpleNamespace
 from typing import Any
 
 from fastmcp import Context, FastMCP
@@ -9,7 +8,7 @@ from clp_mcp_server.clp_connector import ClpConnector
 
 from . import constants
 from .session_manager import SessionManager
-from .utils import filter_query_results
+from .utils import filter_query_results, sort_query_results
 
 
 def create_mcp_server(clp_config: Any) -> FastMCP:
@@ -77,14 +76,14 @@ def create_mcp_server(clp_config: Any) -> FastMCP:
     async def search_kql_query(kql_query: str, ctx: Context) -> dict[str, object]:
         """
         Searches the logs for the specified KQL query and returns the first page of the matching
-        result, each page contains the latest 10 log messages (with data string timestamp)
-        and the pagination metadata.
+        result. The paginated results are ordered from latest to oldest, with each page containing
+        the paging metadata and 10 log messages along with their date string timestamps.
 
         :param kql_query:
         :param ctx: The `FastMCP` context containing the metadata of the underlying MCP session.
         :return: Forwards `FastMCP.tool`''s `get_nth_page`'s return values on success:
         :return: A dictionary with the following key-value pair on failures:
-            - "Error": An error status describing the reason for the query failure.
+            - "Error": An error message describing the failure.
         """
         await session_manager.start()
 
@@ -95,7 +94,8 @@ def create_mcp_server(clp_config: Any) -> FastMCP:
         except (ValueError, RuntimeError, TimeoutError) as e:
             return {"Error": str(e)}
 
-        filtered_results = filter_query_results(results)
+        sorted_results = sort_query_results(results)
+        filtered_results = filter_query_results(sorted_results)
         return session_manager.cache_query_result_and_get_first_page(
             ctx.session_id, filtered_results
         )

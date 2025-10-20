@@ -7,10 +7,10 @@ import sys
 from pathlib import Path
 
 import click
-
 from clp_py_utils.clp_config import CLPConfig
 from clp_py_utils.core import read_yaml_config_file
 from pydantic import ValidationError
+
 from .server import create_mcp_server
 
 
@@ -19,13 +19,19 @@ from .server import create_mcp_server
     "--host", type=str, default="127.0.0.1", help="The server's host address (default: 127.0.0.1)."
 )
 @click.option("--port", type=int, default=8000, help="The server's port number (default: 8000).")
-@click.option("--config", type=click.Path(exists=True), default="/etc/clp-config.yml", help="Path to the server configuration file.")
+@click.option(
+    "--config",
+    type=click.Path(exists=True),
+    default="/etc/clp-config.yml",
+    help="The path to server's configuration file (default: /etc/clp-config.yml).",
+)
 def main(host: str, port: int, config: Path) -> None:
     """
     Runs the CLP MCP server with HTTP transport.
 
     :param host: The server's host address (IP address or hostname).
     :param port: The server's port number (1-65535).
+    :param config: The path to server's configuration file.
     """
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -56,15 +62,14 @@ def main(host: str, port: int, config: Path) -> None:
         logger.error("Port must be between 1 and %d, got: %d.", max_port, port)
         sys.exit(1)
 
-    # Load configuration
     try:
         clp_config = CLPConfig.model_validate(read_yaml_config_file(config))
-    except ValidationError as err:
-        logger.error(err)
-        return 1
-    except Exception as ex:
-        logger.error(ex)
-        return 1
+    except ValidationError:
+        logger.exception("Configuration validation failed.")
+        sys.exit(1)
+    except Exception:
+        logger.exception("Failed to load configuration.")
+        sys.exit(1)
 
     try:
         mcp = create_mcp_server(clp_config)
