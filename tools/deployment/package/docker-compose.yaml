@@ -146,23 +146,18 @@ services:
     hostname: "mcp_server"
     environment:
       CLP_LOGS_DIR: "/var/log/mcp-server"
+      CLP_DB_USER: "${CLP_DB_USER}"
+      CLP_DB_PASS: "${CLP_DB_PASS}"
       PYTHONPATH: "/opt/clp/lib/python3/site-packages"
     ports:
       - host_ip: "${CLP_MCP_HOST:-127.0.0.1}"
         published: "${CLP_MCP_PORT:-8000}"
         target: 8000
     volumes:
+      - *volume_clp_config_readonly
       - type: "bind"
         source: "${CLP_MCP_LOGS_DIR_HOST:-./var/log/mcp-server}"
         target: "/var/log/mcp-server"
-    healthcheck:
-      <<: *healthcheck_defaults
-      test: [
-        "CMD",
-        "curl",
-        "-f",
-        "http://mcp_server:8000/health"
-      ]
     depends_on:
       database:
         condition: "service_healthy"
@@ -173,4 +168,5 @@ services:
       "-m", "clp_mcp_server.clp_mcp_server",
       "--host", "mcp_server",
       "--port", "8000",
+      "--config", "/etc/clp-config.yml",
     ]

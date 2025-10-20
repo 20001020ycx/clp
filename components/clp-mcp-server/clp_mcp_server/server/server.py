@@ -12,7 +12,7 @@ from .session_manager import SessionManager
 from .utils import filter_query_results
 
 
-def create_mcp_server() -> FastMCP:
+def create_mcp_server(clp_config: Any) -> FastMCP:
     """
     Creates and defines API tool calls for the CLP MCP server.
 
@@ -24,12 +24,6 @@ def create_mcp_server() -> FastMCP:
 
     session_manager = SessionManager(session_ttl_seconds=constants.SESSION_TTL_SECONDS)
 
-    clp_config = SimpleNamespace(
-        results_cache=SimpleNamespace(
-            host="results-cache", port=27017, db_name="clp-query-results"
-        ),
-        database=SimpleNamespace(host="database", port=3306, name="clp-db"),
-    )
     connector = ClpConnector(clp_config)
 
     @mcp.tool
