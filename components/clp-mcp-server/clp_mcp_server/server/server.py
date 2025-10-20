@@ -3,8 +3,6 @@
 from types import SimpleNamespace
 from typing import Any
 
-import aiomysql
-import pymongo
 from fastmcp import Context, FastMCP
 
 from clp_mcp_server.clp_connector import ClpConnector
