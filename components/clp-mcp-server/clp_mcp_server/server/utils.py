@@ -10,8 +10,8 @@ def convert_epoch_to_date_string(epoch_ts: int) -> str:
     """
     :param epoch_ts: Unix epoch timestamp in milliseconds.
     :return: ISO 8601 formatted date string with millisecond precision (YYYY-MM-DDTHH:mm:ss.fffZ).
-    :raise TypeError if `epoch_ts` is None or not an int type.
-    :raise ValueError if `epoch_ts` cannot be converted to a valid date string.
+    :raise: TypeError if `epoch_ts` is None or not an int type.
+    :raise: ValueError if `epoch_ts` cannot be converted to a valid date string.
     """
     if epoch_ts is None:
         err_msg = "Epoch timestamp cannot be None."
@@ -28,16 +28,6 @@ def convert_epoch_to_date_string(epoch_ts: int) -> str:
     except (ValueError, OSError, OverflowError) as e:
         err_msg = f"Invalid timestamp {epoch_ts}: {e}."
         raise ValueError(err_msg) from e
-
-
-def sort_query_results(query_results: list[dict]) -> list[dict]:
-    """
-    :param query_results: A list of dictionary containing log entries with its metadata read from
-    MongoDB.
-    :return: A sorted list of dictionary containing log entries with its metadata, ordered by epoch
-    from latest to oldest.
-    """
-    return sorted(query_results, key=lambda log_entry: log_entry.get("timestamp", 0), reverse=True)
 
 
 def filter_query_results(query_results: list[dict]) -> list[str]:
@@ -59,3 +49,13 @@ def filter_query_results(query_results: list[dict]) -> list[str]:
         filtered.append(f"timestamp: {timestamp_str}, message: {message}")
 
     return filtered
+
+
+def sort_query_results(query_results: list[dict]) -> list[dict]:
+    """
+    :param query_results: A list of dictionary containing log entries with its metadata read from
+    MongoDB.
+    :return: A sorted list of dictionary containing log entries with its metadata, ordered by epoch
+    from latest to oldest.
+    """
+    return sorted(query_results, key=lambda log_entry: log_entry.get("timestamp", 0), reverse=True)
