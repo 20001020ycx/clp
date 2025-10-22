@@ -144,6 +144,8 @@ services:
   mcp-server:
     <<: *service_defaults
     hostname: "mcp_server"
+    profiles:
+    - mcp
     environment:
       CLP_LOGS_DIR: "/var/log/mcp-server"
       CLP_DB_USER: "${CLP_DB_USER}"
@@ -168,5 +170,5 @@ services:
       "-m", "clp_mcp_server.clp_mcp_server",
       "--host", "mcp_server",
       "--port", "8000",
-      "--config", "/etc/clp-config.yml",
+      "--config-path", "/etc/clp-config.yml",
     ]
