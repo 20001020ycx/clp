@@ -1,0 +1,55 @@
+# Demo-only in-cluster S3 (MinIO) so the log-ingestor flow runs without an AWS account.
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "minio"
+  labels:
+    app: "minio"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "minio"
+  template:
+    metadata:
+      labels:
+        app: "minio"
+    spec:
+      containers:
+        - name: "minio"
+          image: "minio/minio:RELEASE.2025-04-22T22-12-26Z"
+          # Console on a fixed port so it can be port-forwarded for a browser view.
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: "MINIO_ROOT_USER"
+              value: "minio-demo-key"
+            - name: "MINIO_ROOT_PASSWORD"
+              value: "minio-demo-secret-123"
+          ports:
+            - name: "s3"
+              containerPort: 9000
+            - name: "console"
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: "/minio/health/ready"
+              port: "s3"
+            initialDelaySeconds: 3
+            periodSeconds: 2
+---
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "minio"
+  labels:
+    app: "minio"
+spec:
+  selector:
+    app: "minio"
+  ports:
+    - name: "s3"
+      port: 9000
+      targetPort: "s3"
+    - name: "console"
+      port: 9001
+      targetPort: "console"

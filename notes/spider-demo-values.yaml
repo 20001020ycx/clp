@@ -1,0 +1,101 @@
+# Values overlay for the full-Spider E2E demo: real log-ingestor flow against in-cluster MinIO
+# (see minio-demo.yaml), compression coordinator enabled, Spider storage+scheduler+worker deployed
+# from the published Spider chart 0.1.4, CLP worker image executing the compression tasks.
+# Chart 0.1.4's worker injection hooks (extra_envs/extra_volumes/extra_volume_mounts) carry all the
+# CLP-specific wiring, so no post-install patching is needed.
+# Usage:
+#   helm install test . -f ../../../notes/spider-demo-values.yaml \
+#     --set image.clpPackage.tag=dev-<user>-<id>
+# NOTE: the Secret/ConfigMap names below embed the release name ("test"); Helm cannot template
+# values passed to a subchart, so installing under a different release name requires editing them.
+
+image:
+  clpPackage:
+    repository: "clp-package"
+    # tag: set on the command line (the locally built image from Zhihao's branch)
+    pullPolicy: "Never"
+
+spider:
+  enabled: true
+  image:
+    # storage/scheduler use the chart defaults (upstream ghcr.io/y-scope/spider/*:main) — the
+    # chart's commands expect the upstream binary names; the fork's sha-c4dd00f images use
+    # different ones (spider_storage_grpc_server etc.) and do not fit the chart.
+    # The CLP-tailored worker image (upstream worker:main base + libclp.so TDL package + clp-s,
+    # indexer, log-converter), built from the PR 2408 Dockerfile with the jammy-built cc-e2e TDL
+    # library (see spider-full-e2e-verification.md §0).
+    worker:
+      repository: "clp-spider-worker"
+      tag: "dev-ycx-4fcf"
+      pullPolicy: "Never"
+  spiderConfig:
+    execution_manager:
+      task_executor:
+        # The task executor spawns with a clean env; these are forwarded from the
+        # execution-manager container (supplied via worker.extra_envs below).
+        inherited_env:
+          - "CLP_CONFIG_PATH"
+          - "CLP_HOME"
+          - "CLP_DB_USER"
+          - "CLP_DB_PASS"
+    worker:
+      # One worker keeps the demo's log-verification steps deterministic (the chart default is 4).
+      replicas: 1
+      extra_envs:
+        - name: "CLP_CONFIG_PATH"
+          value: "/etc/clp-config.yaml"
+        - name: "CLP_DB_USER"
+          valueFrom:
+            secretKeyRef:
+              name: "test-clp-database"
+              key: "username"
+        - name: "CLP_DB_PASS"
+          valueFrom:
+            secretKeyRef:
+              name: "test-clp-database"
+              key: "password"
+        - name: "RUST_LOG"
+          value: "info"
+      extra_volume_mounts:
+        # CLP's rendered clp-config.yaml: the task library reads database and archive_output
+        # (incl. MinIO credentials) from it.
+        - name: "clp-config"
+          mountPath: "/etc/clp-config.yaml"
+          subPath: "clp-config.yaml"
+          readOnly: true
+        # Writable staging directory clp-s writes archives to before uploading to S3.
+        - name: "staged-archives"
+          mountPath: "/var/data/staged-archives"
+      extra_volumes:
+        - name: "clp-config"
+          configMap:
+            name: "test-clp-config"
+        - name: "staged-archives"
+          emptyDir: {}
+
+clpConfig:
+  # Real product flow: the log-ingestor scans S3 (MinIO here) and creates compression jobs.
+  logs_input:
+    type: "s3"
+    aws_authentication:
+      type: "credentials"
+      credentials:
+        access_key_id: "minio-demo-key"
+        secret_access_key: "minio-demo-secret-123"
+
+  # Stage 1 is S3-output-only; point archive output at MinIO too.
+  archive_output:
+    storage:
+      type: "s3"
+      s3_config:
+        endpoint_url: "http://minio:9000"
+        # No region_code: the query worker builds the archive URL as
+        # http://<region>.<endpoint-host>/... when a region is set, which doesn't resolve for an
+        # in-cluster endpoint; clp-s falls back to us-east-1 for the S3 client.
+        bucket: "clp-archives"
+        key_prefix: "archives/"
+        aws_authentication:
+          type: "credentials"
+          credentials:
+            access_key_id: "minio-demo-key"
+            secret_access_key: "minio-demo-secret-123"
