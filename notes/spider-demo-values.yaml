@@ -1,13 +1,12 @@
 # Values overlay for the full-Spider E2E demo: real log-ingestor flow against in-cluster MinIO
 # (see minio-demo.yaml), compression coordinator enabled, Spider storage+scheduler+worker deployed
-# from the published Spider chart 0.1.4, CLP worker image executing the compression tasks.
-# Chart 0.1.4's worker injection hooks (extra_envs/extra_volumes/extra_volume_mounts) carry all the
-# CLP-specific wiring, so no post-install patching is needed.
+# from the published Spider chart 0.1.5, CLP worker image executing the compression tasks.
+# The chart's default values now carry all the CLP-specific worker wiring (envs, config/secret
+# mounts, staging volume), so this overlay only enables Spider, points the images at local dev
+# builds, and configures the MinIO-backed S3 input/output.
 # Usage:
 #   helm install test . -f ../../../notes/spider-demo-values.yaml \
 #     --set image.clpPackage.tag=dev-<user>-<id>
-# NOTE: the Secret/ConfigMap names below embed the release name ("test"); Helm cannot template
-# values passed to a subchart, so installing under a different release name requires editing them.
 
 image:
   clpPackage:
@@ -26,21 +25,15 @@ spider:
     # library (see spider-full-e2e-verification.md §0).
     worker:
       repository: "clp-spider-worker"
-      tag: "dev-ycx-4fcf"
+      tag: "dev-ycx-8c14"
       pullPolicy: "Never"
   spiderConfig:
-    execution_manager:
-      task_executor:
-        # The task executor spawns with a clean env; these are forwarded from the
-        # execution-manager container (supplied via worker.extra_envs below).
-        inherited_env:
-          - "CLP_CONFIG_PATH"
-          - "CLP_HOME"
-          - "CLP_DB_USER"
-          - "CLP_DB_PASS"
     worker:
       # One worker keeps the demo's log-verification steps deterministic (the chart default is 4).
       replicas: 1
+      # The demo's log-verification steps need info-level output (the chart default is error-only:
+      # no RUST_LOG). Helm replaces lists wholesale, so adding RUST_LOG means repeating the
+      # chart-default entries too.
       extra_envs:
         - name: "CLP_CONFIG_PATH"
           value: "/etc/clp-config.yaml"
@@ -56,22 +49,6 @@ spider:
               key: "password"
         - name: "RUST_LOG"
           value: "info"
-      extra_volume_mounts:
-        # CLP's rendered clp-config.yaml: the task library reads database and archive_output
-        # (incl. MinIO credentials) from it.
-        - name: "clp-config"
-          mountPath: "/etc/clp-config.yaml"
-          subPath: "clp-config.yaml"
-          readOnly: true
-        # Writable staging directory clp-s writes archives to before uploading to S3.
-        - name: "staged-archives"
-          mountPath: "/var/data/staged-archives"
-      extra_volumes:
-        - name: "clp-config"
-          configMap:
-            name: "test-clp-config"
-        - name: "staged-archives"
-          emptyDir: {}
 
 clpConfig:
   # Real product flow: the log-ingestor scans S3 (MinIO here) and creates compression jobs.
