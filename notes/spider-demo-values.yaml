@@ -31,24 +31,6 @@ spider:
     worker:
       # One worker keeps the demo's log-verification steps deterministic (the chart default is 4).
       replicas: 1
-      # The demo's log-verification steps need info-level output (the chart default is error-only:
-      # no RUST_LOG). Helm replaces lists wholesale, so adding RUST_LOG means repeating the
-      # chart-default entries too.
-      extra_envs:
-        - name: "CLP_CONFIG_PATH"
-          value: "/etc/clp-config.yaml"
-        - name: "CLP_DB_USER"
-          valueFrom:
-            secretKeyRef:
-              name: "test-clp-database"
-              key: "username"
-        - name: "CLP_DB_PASS"
-          valueFrom:
-            secretKeyRef:
-              name: "test-clp-database"
-              key: "password"
-        - name: "RUST_LOG"
-          value: "info"
 
 clpConfig:
   # Real product flow: the log-ingestor scans S3 (MinIO here) and creates compression jobs.
