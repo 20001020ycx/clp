@@ -439,4 +439,23 @@ spider:
             name: "{{ include \"clp.fullname\" . }}-config"
         - name: "staged-archives"
           emptyDir: {}
+      # Spider worker pools. Each entry is deployed as its own set of `replicas` execution managers.
+      # A pool with a non-null `resource_group` is dedicated to that Spider resource group and runs
+      # only that group's tasks; a `null` `resource_group` makes the pool general and runs any
+      # group's tasks. By default, a single general pool serves all Spider-orchestrated jobs.
+      #
+      # A dedicated pool's `resource_group` must name a group that CLP creates (e.g. the
+      # compression-coordinator's `resource_group.name`); a pool bound to a nonexistent group fails
+      # to register. Example of a general pool alongside a pool dedicated to search:
+      #   pools:
+      #     - name: "general"
+      #       replicas: 4
+      #       resource_group: null
+      #     - name: "search"
+      #       replicas: 2
+      #       resource_group: "clp-search"
+      pools:
+        - name: "general"
+          replicas: 4
+          resource_group: null
       service_account_name: "{{ include \"clp.fullname\" . }}-service-account"
