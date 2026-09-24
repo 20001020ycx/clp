@@ -17,13 +17,16 @@ logging_console_handler.setFormatter(logging_formatter)
 logger.addHandler(logging_console_handler)
 
 
-def check_replica_set_status(client: MongoClient, netloc: str) -> tuple[bool, bool]:
+def check_replica_set_status(client: MongoClient, member_host: str) -> tuple[bool, bool]:
     """
     Checks the current replica set status of the MongoDB server and determines whether it needs to
     be configured (or reconfigured).
 
     :param client:
-    :param netloc: The network location of the replica set configuration.
+    :param member_host: The host (and port) this node should be advertising itself as within the
+        replica set config. This may differ from the address used to *connect* to the node -- e.g.
+        a node connects to itself over loopback during initialization, but must advertise a stable
+        address that other members can actually reach.
 
     :return: A tuple containing:
         - is_already_initialized: Indicates whether the replica set has already been initialized.
@@ -39,14 +42,14 @@ def check_replica_set_status(client: MongoClient, netloc: str) -> tuple[bool, bo
     try:
         result = client.admin.command("replSetGetStatus")
         is_already_initialized = True
-        existing_netloc = result["members"][0]["name"]
-        if netloc == existing_netloc:
-            logger.debug("Replica set is already initialized at %s", existing_netloc)
+        existing_host = result["members"][0]["name"]
+        if member_host == existing_host:
+            logger.debug("Replica set is already initialized at %s", existing_host)
         else:
             logger.warning(
                 "Replica set is already initialized at %s, but requested at %s",
-                existing_netloc,
-                netloc,
+                existing_host,
+                member_host,
             )
             should_configure_replica_set = True
     except OperationFailure as e:
@@ -63,22 +66,24 @@ def check_replica_set_status(client: MongoClient, netloc: str) -> tuple[bool, bo
     return is_already_initialized, should_configure_replica_set
 
 
-def init_replica_set_for_oplog(client: MongoClient, netloc: str, force: bool):
+def init_replica_set_for_oplog(client: MongoClient, member_host: str, force: bool):
     """
     Initializes or reconfigures a single-node MongoDB replica set for enabling oplog.
 
     :param client:
-    :param netloc: The network location of the MongoDB instance to configure
-    as a replica set member.
+    :param member_host: The host (and port) to advertise as this node's replica set member
+        identity. This is what every other client will be told to connect to, so it must be an
+        address reachable by them -- not necessarily the address used to connect to this node
+        during initialization.
     :param force: Forces reconfiguration.
     """
-    logger.debug("Initializing single-node replica set for oplog at %s", netloc)
+    logger.debug("Initializing single-node replica set for oplog at %s", member_host)
 
     # `replSetInitiate` can be called without a config object. However, explicit host
     # specification is required, or the docker's ID would be used as the hostname.
     config = {
         "_id": "rs0",
-        "members": [{"_id": 0, "host": netloc}],
+        "members": [{"_id": 0, "host": member_host}],
         "version": 1,
     }
 
@@ -91,13 +96,19 @@ def init_replica_set_for_oplog(client: MongoClient, netloc: str, force: bool):
     logger.debug("Single-node replica set initialized successfully.")
 
 
-def init_replica_set_for_oplog_if_needed(client: MongoClient, uri: str):
+def init_replica_set_for_oplog_if_needed(client: MongoClient, uri: str, member_host: str = None):
     """
     Initializes a MongoDB single-node replica set for enabling oplog, if not already initialized.
 
     :param client: The MongoDB client instance used to connect to the server.
     :param uri: The MongoDB connection URI, which includes the network location (e.g.,
     `hostname:port`) of the MongoDB instance.
+    :param member_host: The host (and port) this node should advertise itself as within the
+        replica set config. Defaults to the URI's network location when not given -- which is
+        correct only when the address used to connect to this node is also reachable by other
+        replica set members. It is NOT correct when `uri` connects over an address such as
+        `127.0.0.1` that only resolves to this node from inside its own container/pod: every other
+        client would then be told to connect to itself, permanently breaking the replica set.
 
     :raises ValueError: If the provided URI is invalid.
     """
@@ -106,28 +117,50 @@ def init_replica_set_for_oplog_if_needed(client: MongoClient, uri: str):
     if 0 == len(netloc):
         raise ValueError("Invalid URI: %s", uri)
 
-    logger.debug("Replica set initialization requested for %s", netloc)
+    if not member_host:
+        member_host = netloc
 
-    is_already_initialized, should_configure_replica_set = check_replica_set_status(client, netloc)
+    logger.debug("Replica set initialization requested for %s", member_host)
+
+    is_already_initialized, should_configure_replica_set = check_replica_set_status(
+        client, member_host
+    )
 
     if should_configure_replica_set:
-        init_replica_set_for_oplog(client, netloc=netloc, force=is_already_initialized)
+        init_replica_set_for_oplog(
+            client, member_host=member_host, force=is_already_initialized
+        )
 
 
 def main(argv):
     args_parser = argparse.ArgumentParser(description="Creates results cache indices for CLP.")
     args_parser.add_argument("--uri", required=True, help="URI of the results cache.")
     args_parser.add_argument(
+        "--member-host",
+        required=False,
+        default=None,
+        help=(
+            "Host (and port) to advertise as this node's replica set member identity. Defaults"
+            " to the host in --uri. Set this explicitly when --uri connects over an address"
+            " (e.g. 127.0.0.1) that only resolves to this node from inside its own"
+            " container/pod -- otherwise every other replica set member is told to connect to"
+            " itself."
+        ),
+    )
+    args_parser.add_argument(
         "--stream-collection", required=True, help="Collection for stream metadata."
     )
     parsed_args = args_parser.parse_args(argv[1:])
 
     results_cache_uri = parsed_args.uri
+    member_host = parsed_args.member_host
     stream_collection_name = parsed_args.stream_collection
 
     try:
         with MongoClient(results_cache_uri, directConnection=True) as results_cache_client:
-            init_replica_set_for_oplog_if_needed(results_cache_client, results_cache_uri)
+            init_replica_set_for_oplog_if_needed(
+                results_cache_client, results_cache_uri, member_host
+            )
 
         with MongoClient(results_cache_uri) as results_cache_client:
             stream_collection = results_cache_client.get_default_database()[stream_collection_name]

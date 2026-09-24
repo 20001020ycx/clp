@@ -12,6 +12,16 @@ spec:
   {{- else }}
   clusterIP: "None"
   {{- end }}
+  # The results-cache-init sidecar advertises this Service's DNS name (clp.resultsCacheHost) as
+  # the node's own replica-set member identity during its FIRST-EVER `replSetInitiate` -- before
+  # the pod is Ready (readiness depends on that same sidecar finishing). Without this, neither the
+  # bare Service name nor the per-pod StatefulSet FQDN resolve during that window (verified
+  # directly against this chart's exact Service/StatefulSet shape: both return NXDOMAIN for a
+  # not-Ready pod, since CoreDNS gates both forms on the same EndpointSlice readiness condition),
+  # reproducing the Service-readiness deadlock of y-scope/clp#2298. This does not affect
+  # steady-state traffic: once the pod is Ready, it is just as reachable as any other endpoint;
+  # the only change is that a brief not-Ready window is no longer invisible to DNS/routing.
+  publishNotReadyAddresses: true
   selector:
     {{- include "clp.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: "results-cache"
