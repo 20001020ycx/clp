@@ -3997,8 +3997,8 @@ dependencies = [
 
 [[package]]
 name = "spider-client"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "spider-core",
  "spider-proto-rust",
@@ -4010,12 +4010,13 @@ dependencies = [
 
 [[package]]
 name = "spider-core"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "non-empty-string",
  "rand 0.9.5",
  "rmp-serde",
+ "secrecy",
  "semver",
  "serde",
  "serde_json",
@@ -4029,8 +4030,8 @@ dependencies = [
 
 [[package]]
 name = "spider-derive"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4039,8 +4040,8 @@ dependencies = [
 
 [[package]]
 name = "spider-proto-rust"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "prost",
  "spider-core",
@@ -4054,8 +4055,8 @@ dependencies = [
 
 [[package]]
 name = "spider-tdl"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "const-str",
  "rmp-serde",
@@ -4067,8 +4068,8 @@ dependencies = [
 
 [[package]]
 name = "spider-tdl-derive"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4077,8 +4078,8 @@ dependencies = [
 
 [[package]]
 name = "spider-utils"
-version = "0.1.0-rc.1"
-source = "git+https://github.com/y-scope/spider.git?tag=v0.1.0-rc.1-huntsman#403e683ca18a2f7a6b8f2f6da9c291f0170cb896"
+version = "0.1.0-dev"
+source = "git+https://github.com/y-scope/spider.git?branch=main#4692b8892faf738faadbbbc5d705cf2e9f103e20"
 dependencies = [
  "non-empty-string",
  "rand 0.9.5",
