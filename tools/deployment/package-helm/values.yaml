@@ -202,8 +202,6 @@ clpConfig:
     job_polling_interval_millisecs: 100
     logging_level: "INFO"
     max_concurrent_jobs: 1000
-    resource_group:
-      name: "compression-worker"
     result_polling:
       init_backoff_millisecs: 100
       max_backoff_millisecs: 1000
@@ -382,7 +380,7 @@ credentials:
     password: "pass"
 
   spiderResourceGroups:
-    compression: "compress-pass"
+    compression: "compression-pass"
 
 serviceAccount:
   annotations:
@@ -393,6 +391,11 @@ serviceAccount:
 spider:
   enabled: false
   image:
+    # Temporary pin: upcoming Spider `main` changes may break, and its next release is a while away.
+    scheduler:
+      tag: "sha-f3a97c2"
+    storage:
+      tag: "sha-f3a97c2"
     worker:
       repository: "ghcr.io/y-scope/clp/clp-spider-worker"
       tag: "main"

@@ -22,7 +22,6 @@ use std::time::Duration;
 use clp_rust_utils::clp_config::package::config::CompressionCoordinator as CoordinatorConfig;
 use clp_rust_utils::clp_config::package::config::Database as DatabaseConfig;
 use clp_rust_utils::clp_config::package::config::Spider as SpiderConfig;
-use clp_rust_utils::clp_config::package::config::SpiderResourceGroup;
 use clp_rust_utils::job_config::ClpIoConfig;
 use clp_rust_utils::job_config::CompressionJobId;
 use clp_rust_utils::job_config::CompressionJobStatus;
@@ -108,15 +107,11 @@ impl Coordinator {
             .inspect_err(|e| {
                 tracing::error!(error = % e, "Failed to connect to Spider.");
             })?;
-        let resource_group_id = get_or_create_resource_group_id(
-            &coordinator_config.resource_group,
-            &spider_client,
-            &db_pool,
-        )
-        .await
-        .inspect_err(|e| {
-            tracing::error!(error = % e, "Failed to get or create resource group.");
-        })?;
+        let resource_group_id = get_or_create_resource_group_id(&spider_client, &db_pool)
+            .await
+            .inspect_err(|e| {
+                tracing::error!(error = % e, "Failed to get or create resource group.");
+            })?;
 
         let spider_option = Arc::new(SpiderOption {
             compression_task_max_retry: coordinator_config.compression_task_max_retry,
@@ -556,17 +551,17 @@ struct RunningJobRowProjection {
     serialized_clp_io_config: Vec<u8>,
 }
 
-/// Retrieves the Spider resource group ID for the configured resource group, registering it if it
-/// does not yet exist.
+/// Retrieves the Spider resource group ID for the resource group whose credentials are read from
+/// the environment, registering it if it does not yet exist.
 ///
 /// # Errors
 ///
 /// Returns an error if:
 ///
+/// * Forwards [`ExternalResourceGroupCredentials::from_env`]'s return values on failure.
 /// * Forwards [`sqlx::query::Query::execute`]'s return values on failure.
 /// * Forwards [`SpiderClient::add_resource_group`]'s return values on failure.
 async fn get_or_create_resource_group_id(
-    resource_group_config: &SpiderResourceGroup,
     spider_client: &SpiderClient,
     db_pool: &sqlx::MySqlPool,
 ) -> Result<ResourceGroupId, Error> {
@@ -591,9 +586,10 @@ async fn get_or_create_resource_group_id(
 
     sqlx::query(CREATE_TABLE_QUERY).execute(db_pool).await?;
 
-    let resource_group = resource_group_config.name.as_str();
+    let credentials = ExternalResourceGroupCredentials::from_env()?;
+    let resource_group = credentials.get_external_resource_group_id().to_owned();
     let existing_rg_id: Option<u64> = sqlx::query_scalar(SELECT_QUERY)
-        .bind(resource_group)
+        .bind(&resource_group)
         .fetch_optional(db_pool)
         .await?;
     if let Some(spider_rg_id) = existing_rg_id {
@@ -605,21 +601,10 @@ async fn get_or_create_resource_group_id(
         return Ok(ResourceGroupId::from(spider_rg_id));
     }
 
-    let password = std::env::var("CLP_SPIDER_RESOURCE_GROUP_PASSWORD").map_err(|e| {
-        Error::InvalidConfiguration(format!(
-            "failed to read the resource group password from \
-             `CLP_SPIDER_RESOURCE_GROUP_PASSWORD`: {e}"
-        ))
-    })?;
-    let resource_group_id = spider_client
-        .add_resource_group(ExternalResourceGroupCredentials::new(
-            resource_group.to_owned(),
-            password.into_bytes(),
-        ))
-        .await?;
+    let resource_group_id = spider_client.add_resource_group(credentials).await?;
 
     sqlx::query(INSERT_QUERY)
-        .bind(resource_group)
+        .bind(&resource_group)
         .bind(resource_group_id.get())
         .execute(db_pool)
         .await

@@ -1,9 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Resource-group-aware execution-manager support landed after the last Spider
-# worker release used here. Pin an immutable multi-architecture image built from
-# Spider revision 12fa1ef5 (including resource-group pinning commit 7e07ffb5).
-ARG SPIDER_WORKER_IMAGE=ghcr.io/y-scope/spider/worker@sha256:24e5d225ee958704d96f3f46396ba67912c984b97dc224182c11a3ddd221680e
+ARG SPIDER_WORKER_IMAGE=ghcr.io/y-scope/spider/worker:sha-f3a97c2
 FROM ${SPIDER_WORKER_IMAGE}
 
 ARG SPIDER_TDL_PACKAGE_DIR=/opt/spider/packages
