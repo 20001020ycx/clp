@@ -7,6 +7,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "celery[redis]>=5.6.2",
+    # kombu>=5.7.0 only depends on `tzdata` on Windows, but our images have no system timezone data.
+    "kombu==5.6.2",
     "mariadb>=1.1.14",
     "msgpack>=1.1.2",
     "mysql-connector-python>=9.5.0",
