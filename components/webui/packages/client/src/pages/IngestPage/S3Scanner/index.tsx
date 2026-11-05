@@ -8,6 +8,7 @@ import {
     Button,
     Form,
     Input,
+    InputNumber,
     Typography,
 } from "antd";
 
@@ -68,6 +69,18 @@ const S3Scanner = () => {
                         <Input placeholder={placeholder}/>
                     </Form.Item>
                 ))}
+                <Form.Item
+                    label={"Buffer Timeout (seconds)"}
+                    name={"bufferTimeoutSec"}
+                    tooltip={"Maximum time an object stays buffered before a compression job " +
+                        "is created. Defaults to 300 seconds."}
+                >
+                    <InputNumber
+                        min={1}
+                        placeholder={"300"}
+                        precision={0}
+                        style={{width: "100%"}}/>
+                </Form.Item>
                 <ClpSFormItems/>
                 <Form.Item>
                     <Button

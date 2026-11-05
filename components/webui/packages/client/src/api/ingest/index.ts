@@ -16,6 +16,9 @@ import axios, {isAxiosError} from "axios";
 const submitS3Scanner = async (payload: S3ScannerCreation): Promise<S3ScannerJob> => {
     const config: S3ScannerConfig = {
         bucket_name: payload.bucket,
+        ...("number" === typeof payload.bufferTimeoutSec ?
+            {buffer_config: {timeout_sec: payload.bufferTimeoutSec}} :
+            {}),
         dataset: payload.dataset || CLP_DEFAULT_DATASET_NAME,
         key_prefix: payload.keyPrefix,
         region: payload.region,

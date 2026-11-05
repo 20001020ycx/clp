@@ -13,8 +13,12 @@ const requiredInputFields = {
     region: Type.String({minLength: 1, pattern: "\\S"}),
 };
 
+const BufferTimeoutSecSchema = Type.Integer({minimum: 1, maximum: Number.MAX_SAFE_INTEGER});
+
 const S3ScannerCreationSchema = Type.Object({
     ...requiredInputFields,
+    bufferTimeoutSec: Type.Optional(Type.Union([Type.Null(),
+        BufferTimeoutSecSchema])),
     dataset: Type.Optional(Type.Union([Type.Literal(""),
         DatasetNameSchema])),
     timestampKey: Type.Optional(Type.String()),
@@ -25,6 +29,9 @@ type S3ScannerCreation = Static<typeof S3ScannerCreationSchema>;
 
 const S3ScannerConfigSchema = Type.Object({
     bucket_name: requiredInputFields.bucket,
+    buffer_config: Type.Optional(Type.Object({
+        timeout_sec: BufferTimeoutSecSchema,
+    }, {additionalProperties: false})),
     dataset: Type.Optional(DatasetNameSchema),
     key_prefix: requiredInputFields.keyPrefix,
     region: requiredInputFields.region,
