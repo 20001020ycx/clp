@@ -9,13 +9,16 @@ allowHostAccessForSbinScripts: true
 # the tag is only a human-readable label.
 image:
   # Installs the CLP connector plugin into the Presto coordinator and worker pods.
+  # NOTE: The connector must be built against the Presto sources that `prestoCoordinator` and
+  # `prestoWorker` were built from. The worker loads the connector without checking this, and
+  # crashes on its first CLP query if the two don't match, so change the three images together.
   # NOTE: Archives on S3 with `aws_authentication.type: "default"` require a connector that supports
   # the "default" S3 auth provider.
   clpConnector:
     repository: "ghcr.io/y-scope/clp-plugin-presto-connector"
     pullPolicy: "IfNotPresent"
     tag: "0.1.0-SNAPSHOT"
-    digest: "sha256:1155f8f9694b0b43cfee252d6ae301ee36e4cdb91b906d1a1f045a7df37d0eb3"
+    digest: "sha256:9dda4a6b97da9d94b513675e6aab31797600b291d028762edb7434065ef380f3"
   clpPackage:
     repository: "ghcr.io/y-scope/clp/clp-package"
     pullPolicy: "Always"
@@ -43,15 +46,15 @@ image:
     tag: "0.152.0"
   # The coordinator and worker must run the same Presto version, which the connector must support.
   prestoCoordinator:
-    repository: "ghcr.io/y-scope/presto"
+    repository: "prestodb/presto"
     pullPolicy: "IfNotPresent"
     tag: "0.299"
-    digest: "sha256:87e9ce10a1184f1b5ce0dd74591ef753c3afe763d860ef412a331684ec653753"
+    digest: "sha256:52495a126cf2a6bc7ffce736b2dcb081144c216185f5685881755d880007afbc"
   prestoWorker:
-    repository: "ghcr.io/y-scope/presto-native"
+    repository: "prestodb/presto-native"
     pullPolicy: "IfNotPresent"
     tag: "0.299"
-    digest: "sha256:8f9ca4ba7dd844385b85e7e3bd9568128096e2a7ad09432c6a982ea11279a13b"
+    digest: "sha256:a4bc7ffc03cbaf689a120cbec91d4e644529bf6c47b1cb15dac6729e2e178249"
   queue:
     repository: "rabbitmq"
     pullPolicy: "Always"

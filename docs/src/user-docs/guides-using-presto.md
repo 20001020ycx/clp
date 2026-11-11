@@ -133,6 +133,12 @@ set using `image.prestoCoordinator`, `image.prestoWorker`, and `image.clpConnect
 multi-architecture (`linux/amd64` and `linux/arm64`). The coordinator and worker must run the same
 Presto version, which the connector must support.
 
+:::{warning}
+Change the three images together. The connector must be built against the Presto sources that the
+coordinator and worker images were built from. The worker doesn't check this when it loads the
+connector, and crashes on its first CLP query if they don't match.
+:::
+
 ## Docker Compose
 
 ### Requirements
