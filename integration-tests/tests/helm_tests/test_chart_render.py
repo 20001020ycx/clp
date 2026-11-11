@@ -265,6 +265,27 @@ def test_presto_pods_roll_when_their_catalog_changes(default_auth_chart: Rendere
     assert set() == changed_pods(values)
 
 
+def test_presto_bounds_archive_memory(presto_chart: RenderedChart) -> None:
+    """
+    Tests that the chart can bound the archives that workers hold in memory, by capping the queries
+    that run at once and the archives that each table scan reads at once, and that it leaves
+    Presto's defaults in place otherwise.
+    """
+    coordinator_key = "presto-coordinator-config-config.properties"
+    worker_key = "presto-worker-config-config.properties"
+    assert "query.max-concurrent-queries" not in _config_map_properties(
+        presto_chart, coordinator_key
+    )
+    assert "task.max-drivers-per-task" not in _config_map_properties(presto_chart, worker_key)
+
+    values = _presto_values()
+    values["clpConfig"]["presto"]["coordinator"]["max_concurrent_queries"] = 4
+    values["clpConfig"]["presto"]["worker"]["max_drivers_per_task"] = 2
+    chart = render_chart(values)
+    assert "4" == _config_map_properties(chart, coordinator_key)["query.max-concurrent-queries"]
+    assert "2" == _config_map_properties(chart, worker_key)["task.max-drivers-per-task"]
+
+
 @pytest.mark.parametrize(
     ("image", "expected_ref"),
     [
