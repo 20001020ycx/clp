@@ -24,8 +24,11 @@ spec:
   template:
     metadata:
       annotations:
-        # Kubernetes doesn't restart Presto when its catalog changes, so roll the pod instead.
+        # Kubernetes doesn't restart Presto when its catalog or config changes, so roll the pod
+        # instead.
         checksum/presto-catalog: {{ include "clp.prestoCoordinatorCatalog" . | sha256sum | quote }}
+        checksum/presto-config: {{ omit .Values.clpConfig.presto "worker" | toJson | sha256sum
+          | quote }}
       labels:
         {{- include "clp.labels" . | nindent 8 }}
         app.kubernetes.io/component: "presto-coordinator"
