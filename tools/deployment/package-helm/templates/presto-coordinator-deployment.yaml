@@ -8,6 +8,15 @@ metadata:
     app.kubernetes.io/component: "presto-coordinator"
 spec:
   replicas: 1
+  # Every coordinator pod has the same node ID and announces itself to the discovery service behind
+  # the coordinator's Service. A new pod that starts while the old one still serves finds the old
+  # pod's announcement, and refuses to start if the two run different Presto versions, so stop the
+  # old pod before starting the new one.
+  strategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       {{- include "clp.selectorLabels" . | nindent 6 }}

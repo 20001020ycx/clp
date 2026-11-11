@@ -265,6 +265,20 @@ def test_presto_pods_roll_when_their_catalog_changes(default_auth_chart: Rendere
     assert set() == changed_pods(values)
 
 
+def test_presto_coordinator_stops_before_its_replacement_starts(
+    presto_chart: RenderedChart,
+) -> None:
+    """
+    Tests that an upgrade stops the coordinator pod before it starts the new one. Otherwise, the
+    new pod finds the old pod's announcement in the discovery service and, if the two run
+    different Presto versions, refuses to start.
+    """
+    assert {
+        "type": "RollingUpdate",
+        "rollingUpdate": {"maxSurge": 0, "maxUnavailable": 1},
+    } == presto_chart.get("Deployment", COORDINATOR)["spec"]["strategy"]
+
+
 @pytest.mark.parametrize(
     ("image", "expected_ref"),
     [
