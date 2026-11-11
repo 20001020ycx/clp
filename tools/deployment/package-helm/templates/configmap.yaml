@@ -426,6 +426,9 @@ data:
     http-server.http.port=8889
     query.max-memory={{ .coordinator.query_max_memory_gb }}GB
     query.max-memory-per-node={{ .coordinator.query_max_memory_per_node_gb }}GB
+    {{- with .coordinator.max_concurrent_queries }}
+    query.max-concurrent-queries={{ . | int }}
+    {{- end }}
     discovery-server.enabled=true
     discovery.uri=http://{{ include "clp.fullname" $ }}-presto-coordinator:8889
     optimizer.optimize-hash-generation=false
@@ -463,6 +466,9 @@ data:
     query-memory-gb={{ .worker.query_memory_gb }}
     shutdown-onset-sec=1
     system-memory-gb={{ .worker.system_memory_gb }}
+    {{- with .worker.max_drivers_per_task }}
+    task.max-drivers-per-task={{ . | int }}
+    {{- end }}
     register-test-functions=false
     runtime-metrics-collection-enabled=false
     plugin.dir=/opt/presto-server/plugin/clp
