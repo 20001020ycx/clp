@@ -325,8 +325,10 @@ clpConfig:
   # `archive_output.target_segment_size + archive_output.target_dictionaries_size` each, and this
   # memory isn't counted towards `worker.system_memory_gb`. `coordinator.max_concurrent_queries` and
   # `worker.max_drivers_per_task` limit the archives that a worker scans at once to their product,
-  # per table scan. Without them, a query scans as many archives at once as the worker has CPU
-  # cores, and any number of queries run at once.
+  # per table scan. A query that ends early, e.g., at its `LIMIT`, keeps its archives until its
+  # scans finish reading them, so a worker can briefly hold twice as many. Without the two settings,
+  # a query scans as many archives at once as the worker's node has CPU cores, and any number of
+  # queries run at once.
   presto: null
   #   serviceType: "ClusterIP"  # "NodePort", "ClusterIP", or "LoadBalancer"
   #   host: "localhost"
@@ -338,12 +340,12 @@ clpConfig:
   #     query_max_memory_gb: 1
   #     query_max_memory_per_node_gb: 1
   #     # Optional: How many queries run at once. The rest wait in a queue.
-  #     max_concurrent_queries: 4
+  #     max_concurrent_queries: 2
   #   worker:
   #     query_memory_gb: 4
   #     system_memory_gb: 8
   #     # Optional: How many archives one table scan reads at once on a worker.
-  #     max_drivers_per_task: 4
+  #     max_drivers_per_task: 1
   #   # Split filter config for Presto CLP connector.
   #   # See https://docs.yscope.com/presto/connector/clp.html#split-filter-config-file
   #   split_filter: {}

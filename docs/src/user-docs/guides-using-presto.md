@@ -62,12 +62,12 @@ the clp-s native query components can optionally be disabled to save resources.
          query_max_memory_gb: 1
          query_max_memory_per_node_gb: 1
          # See "Worker memory" below.
-         max_concurrent_queries: 4
+         max_concurrent_queries: 2
        worker:
          query_memory_gb: 4
          system_memory_gb: 8
          # See "Worker memory" below.
-         max_drivers_per_task: 4
+         max_drivers_per_task: 1
        # Split filter config for the Presto CLP connector. For each dataset, add a filter entry.
        # Replace <dataset> with the dataset name (use "default" if you didn't specify one when
        # compressing) and <timestamp-key> with the timestamp key used during compression.
@@ -110,8 +110,9 @@ A Presto worker holds every archive that it's scanning decompressed in memory, a
 count this memory towards `clpConfig.presto.worker.system_memory_gb`. Each archive takes about
 `clpConfig.archive_output.target_segment_size` plus
 `clpConfig.archive_output.target_dictionaries_size`, which is 288 MiB by default. Unless you limit
-them, a query scans as many archives at once as the worker has CPU cores and any number of queries
-run at once, so a few concurrent queries can use more memory than the worker has and get it killed.
+them, a query scans as many archives at once as the worker's node has CPU cores and any number of
+queries run at once, so a few concurrent queries can use more memory than the worker has and get it
+killed.
 
 Two settings limit the archives that a worker scans at once to their product, for each table that a
 query scans:
@@ -121,10 +122,13 @@ query scans:
 * `clpConfig.presto.worker.max_drivers_per_task`: How many archives one table scan reads at once on
   a worker.
 
-With the values above, a worker scans at most 4 × 4 = 16 archives at once, which takes about
-16 × 288 MiB = 4.5 GiB. The worker's memory limit (`resources.prestoWorker.limits.memory`) must
-leave room for this memory on top of `clpConfig.presto.worker.system_memory_gb`. Lower values use
-less memory but scan fewer archives in parallel.
+A query that ends early, e.g., at its `LIMIT`, keeps its archives until its scans finish reading
+them, while the next query already runs. A worker can therefore briefly hold twice as many archives
+as the product. With the values above, that is 2 × 2 × 1 = 4 archives, which take about
+4 × 288 MiB = 1.1 GiB. The worker's memory limit (`resources.prestoWorker.limits.memory`) must
+leave room for this memory in addition to the memory that Presto tracks, which
+`clpConfig.presto.worker.system_memory_gb` caps. Lower values use less memory, but queries wait
+longer in the queue and scan fewer archives in parallel.
 
 ### Archives on S3
 
