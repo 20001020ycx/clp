@@ -122,11 +122,12 @@ query scans:
 * `clpConfig.presto.worker.max_drivers_per_task`: How many archives one table scan reads at once on
   a worker.
 
-A query that ends early, e.g., at its `LIMIT`, keeps its archives until its scans finish reading
-them, while the next query already runs. A worker can therefore briefly hold twice as many archives
-as the product. With the values above, that is 2 × 2 × 1 = 4 archives, which take about
-4 × 288 MiB = 1.1 GiB. The worker's memory limit (`resources.prestoWorker.limits.memory`) must
-leave room for this memory in addition to the memory that Presto tracks, which
+A query that ends early, at its `LIMIT` or because it's cancelled, keeps its archives until its
+scans finish reading them, while the next query already runs. A worker can therefore briefly hold
+more archives than the product: plan for twice as many, and for more if users may cancel several
+queries in a row. With the values above, twice the product is 2 × 2 × 1 = 4 archives, which take
+about 4 × 288 MiB = 1.1 GiB. The worker's memory limit (`resources.prestoWorker.limits.memory`)
+must leave room for this memory in addition to the memory that Presto tracks, which
 `clpConfig.presto.worker.system_memory_gb` caps. Lower values use less memory, but queries wait
 longer in the queue and scan fewer archives in parallel.
 

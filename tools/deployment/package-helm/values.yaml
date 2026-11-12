@@ -325,10 +325,11 @@ clpConfig:
   # `archive_output.target_segment_size + archive_output.target_dictionaries_size` each, and this
   # memory isn't counted towards `worker.system_memory_gb`. `coordinator.max_concurrent_queries` and
   # `worker.max_drivers_per_task` limit the archives that a worker scans at once to their product,
-  # per table scan. A query that ends early, e.g., at its `LIMIT`, keeps its archives until its
-  # scans finish reading them, so a worker can briefly hold twice as many. Without the two settings,
-  # a query scans as many archives at once as the worker's node has CPU cores, and any number of
-  # queries run at once.
+  # per table scan. A query that ends early, at its `LIMIT` or because it's cancelled, keeps its
+  # archives until its scans finish reading them, so a worker can briefly hold more than the
+  # product: plan for twice as many, and for more if users may cancel several queries in a row.
+  # Without the two settings, a query scans as many archives at once as the worker's node has CPU
+  # cores, and any number of queries run at once.
   presto: null
   #   serviceType: "ClusterIP"  # "NodePort", "ClusterIP", or "LoadBalancer"
   #   host: "localhost"
